@@ -4,7 +4,7 @@ import (
   "log"
   "fmt"
   "net/http"
-  "os/exec"
+  "github.com/stianeikeland/go-rpio/v4"
 )
 
 func GetPageHTML(coffeeMakerOn bool) string {
@@ -28,9 +28,24 @@ func GetPageHTML(coffeeMakerOn bool) string {
 </html>`, coffeeStatus)
 }
 
+var coffeeMakerPin = rpio.Pin(13)
+
+func turnOnCoffeeMaker() {
+  coffeeMakerPin.High()
+}
+
+func turnOffCoffeeMaker() {
+  coffeeMakerPin.Low()
+}
+
 func main() {
+  if err := rpio.Open(); err != nil {
+    log.Fatal(err)
+  }
+  defer rpio.Close()
+  coffeeMakerPin.Output()
+
   coffeeStatus := false
-  pin := 7
   http.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(rw, "%s", GetPageHTML(coffeeStatus))
   })
@@ -38,21 +53,13 @@ func main() {
     coffeeStatus = true
     fmt.Fprintf(rw, "%s", GetPageHTML(coffeeStatus))
     log.Println("Coffee maker turned on!")
-    cmd := exec.Command("gpio", "mode", fmt.Sprint(pin), "up")
-    _, err := cmd.Output()
-    if err != nil {
-      fmt.Println(err.Error())
-    }
+    turnOnCoffeeMaker()
   })
   http.HandleFunc("/coffeeoff", func(rw http.ResponseWriter, r *http.Request) {
     coffeeStatus = false
     fmt.Fprintf(rw, "%s", GetPageHTML(coffeeStatus))
     log.Println("Coffee maker turned off!")
-    cmd := exec.Command("gpio", "mode", fmt.Sprint(pin), "down")
-    _, err := cmd.Output()
-    if err != nil {
-      fmt.Println(err.Error())
-    }
+    turnOffCoffeeMaker()
   })
 
   log.Fatal(http.ListenAndServe(":1337", nil))
